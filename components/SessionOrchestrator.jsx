@@ -89,13 +89,16 @@ export default function SessionOrchestrator() {
    * Restore session from localStorage or create new
    */
   const restoreSession = async () => {
+    console.log('🔄 restoreSession called');
     try {
       // Check if we're in the browser (not SSR)
       if (typeof window === 'undefined') {
+        console.log('⚠️  Server side - skipping restore');
         setLoading(false);
         return;
       }
 
+      console.log('✅ Browser detected, checking localStorage...');
       const savedSession = localStorage.getItem('experimentSession');
 
       if (savedSession) {
@@ -121,12 +124,15 @@ export default function SessionOrchestrator() {
 
         // Load cases for current phase
         await loadCasesForPhase(session.currentPhase, session);
+      } else {
+        console.log('✅ No saved session - starting fresh');
       }
 
+      console.log('✅ Setting loading to false');
       setLoading(false);
     } catch (err) {
       console.error('❌ Error restoring session:', err);
-      setError('Failed to restore session');
+      setError(`Failed to restore session: ${err.message}`);
       setLoading(false);
     }
   };
