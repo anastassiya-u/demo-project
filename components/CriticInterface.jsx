@@ -40,6 +40,46 @@ export default function CriticInterface({ caseData, onComplete }) {
     { id: 'differential', label: 'Compare Differential Diagnosis', icon: '🔬' },
   ];
 
+  // Handle hypothesis submission - MUST be defined before useEffect that uses it
+  const handleSubmitHypothesis = useCallback(async () => {
+    if (hypothesis.length < 3) {
+      showNotification('Please enter a diagnosis (at least 3 characters)', 'warning');
+      return;
+    }
+
+    setHypothesisSubmitted(true);
+    await logger.submitHypothesis(hypothesis);
+
+    // Log AI output viewed (for Critic, this happens after hypothesis)
+    await logger.viewAIOutput(
+      caseData.aiRecommendation,
+      caseData.correctDiagnosis,
+      caseData.isFoil
+    );
+  }, [hypothesis, showNotification, caseData]);
+
+  // Handle final diagnosis submission - MUST be defined before useEffect that uses it
+  const handleSubmitFinal = useCallback(async () => {
+    if (!confidencePost) {
+      showNotification('Please rate your final confidence before submitting', 'warning');
+      return;
+    }
+
+    const diagnosisToSubmit = revisedHypothesis ? finalDiagnosis : hypothesis;
+
+    // Log revision only once
+    if (revisedHypothesis && finalDiagnosis !== hypothesis && !revisionLogged) {
+      await logger.reviseHypothesis(
+        finalDiagnosis,
+        'User revised after seeing contrastive evidence'
+      );
+      setRevisionLogged(true);
+    }
+
+    await logger.submitFinalDiagnosis(diagnosisToSubmit);
+    onComplete();
+  }, [confidencePost, revisedHypothesis, finalDiagnosis, hypothesis, revisionLogged, showNotification, onComplete]);
+
   // Initialize case
   useEffect(() => {
     logger.startCase(caseData.id, caseData.order);
@@ -59,24 +99,6 @@ export default function CriticInterface({ caseData, onComplete }) {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [caseData, hypothesisSubmitted, hypothesis, confidencePre, confidencePost, handleSubmitHypothesis, handleSubmitFinal]);
-
-  // Handle hypothesis submission
-  const handleSubmitHypothesis = useCallback(async () => {
-    if (hypothesis.length < 3) {
-      showNotification('Please enter a diagnosis (at least 3 characters)', 'warning');
-      return;
-    }
-
-    setHypothesisSubmitted(true);
-    await logger.submitHypothesis(hypothesis);
-
-    // Log AI output viewed (for Critic, this happens after hypothesis)
-    await logger.viewAIOutput(
-      caseData.aiRecommendation,
-      caseData.correctDiagnosis,
-      caseData.isFoil
-    );
-  }, [hypothesis, showNotification, caseData]);
 
   // Handle evidence panel reveal
   const handleRevealPanel = async (panelId) => {
@@ -107,28 +129,6 @@ export default function CriticInterface({ caseData, onComplete }) {
     setRevisedHypothesis(true);
     setFinalDiagnosis(hypothesis); // Pre-fill with original
   };
-
-  // Handle final diagnosis submission
-  const handleSubmitFinal = useCallback(async () => {
-    if (!confidencePost) {
-      showNotification('Please rate your final confidence before submitting', 'warning');
-      return;
-    }
-
-    const diagnosisToSubmit = revisedHypothesis ? finalDiagnosis : hypothesis;
-
-    // Log revision only once
-    if (revisedHypothesis && finalDiagnosis !== hypothesis && !revisionLogged) {
-      await logger.reviseHypothesis(
-        finalDiagnosis,
-        'User revised after seeing contrastive evidence'
-      );
-      setRevisionLogged(true);
-    }
-
-    await logger.submitFinalDiagnosis(diagnosisToSubmit);
-    onComplete();
-  }, [confidencePost, revisedHypothesis, finalDiagnosis, hypothesis, revisionLogged, showNotification, onComplete]);
 
   return (
     <>

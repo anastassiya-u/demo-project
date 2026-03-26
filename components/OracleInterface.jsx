@@ -24,6 +24,22 @@ export default function OracleInterface({ caseData, onComplete }) {
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
+  // Handle final diagnosis submission - MUST be defined before useEffect that uses it
+  const handleSubmitFinal = useCallback(async () => {
+    if (!confidence) {
+      showNotification('Please rate your confidence before submitting', 'warning');
+      return;
+    }
+
+    if (!finalDiagnosis) {
+      showNotification('Please enter your diagnosis', 'warning');
+      return;
+    }
+
+    await logger.submitFinalDiagnosis(finalDiagnosis);
+    onComplete();
+  }, [confidence, finalDiagnosis, showNotification, onComplete]);
+
   // Initialize case
   useEffect(() => {
     logger.startCase(caseData.id, caseData.order);
@@ -62,22 +78,6 @@ export default function OracleInterface({ caseData, onComplete }) {
     setConfidence(rating);
     await logger.rateConfidence(rating, 'post');
   };
-
-  // Handle final diagnosis submission
-  const handleSubmitFinal = useCallback(async () => {
-    if (!confidence) {
-      showNotification('Please rate your confidence before submitting', 'warning');
-      return;
-    }
-
-    if (!finalDiagnosis) {
-      showNotification('Please enter your diagnosis', 'warning');
-      return;
-    }
-
-    await logger.submitFinalDiagnosis(finalDiagnosis);
-    onComplete();
-  }, [confidence, finalDiagnosis, showNotification, onComplete]);
 
   return (
     <>

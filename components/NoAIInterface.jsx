@@ -18,6 +18,21 @@ export default function NoAIInterface({ caseData, onComplete }) {
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
+  // Define handleSubmit BEFORE useEffect that references it
+  const handleSubmit = useCallback(async () => {
+    if (!diagnosis || !confidence) {
+      showNotification('Please enter a diagnosis and rate your confidence', 'warning');
+      return;
+    }
+
+    const taskTime = Math.round((Date.now() - startTime) / 1000);
+
+    // Log as a no-AI case
+    await logger.submitFinalDiagnosis(diagnosis);
+
+    onComplete();
+  }, [diagnosis, confidence, startTime, showNotification, onComplete]);
+
   useEffect(() => {
     setStartTime(Date.now());
     logger.startCase(caseData.id, caseData.order);
@@ -33,20 +48,6 @@ export default function NoAIInterface({ caseData, onComplete }) {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [caseData, diagnosis, confidence, handleSubmit]);
-
-  const handleSubmit = useCallback(async () => {
-    if (!diagnosis || !confidence) {
-      showNotification('Please enter a diagnosis and rate your confidence', 'warning');
-      return;
-    }
-
-    const taskTime = Math.round((Date.now() - startTime) / 1000);
-
-    // Log as a no-AI case
-    await logger.submitFinalDiagnosis(diagnosis);
-
-    onComplete();
-  }, [diagnosis, confidence, startTime, showNotification, onComplete]);
 
   return (
     <>
