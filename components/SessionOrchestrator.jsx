@@ -36,10 +36,16 @@ import { useNotification } from './Notification';
 // Import cases data
 import casesData from '../src/data/cases.json';
 
+console.log('🔧 Creating Supabase client...');
+console.log('SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'defined' : 'UNDEFINED');
+console.log('SUPABASE_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'defined' : 'UNDEFINED');
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+console.log('✅ Supabase client created');
 
 /**
  * Experimental Phases
@@ -56,6 +62,8 @@ const PHASES = {
 };
 
 export default function SessionOrchestrator() {
+  console.log('🚀 SessionOrchestrator component rendering');
+
   // User & Session State
   const [userId, setUserId] = useState(null);
   const [studentId, setStudentId] = useState('');
@@ -80,6 +88,7 @@ export default function SessionOrchestrator() {
    * Initialize or restore session on mount
    */
   useEffect(() => {
+    console.log('⚡ useEffect running - calling restoreSession...');
     restoreSession();
   }, []);
 
