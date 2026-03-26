@@ -84,6 +84,8 @@ export default function SessionOrchestrator() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  console.log('🔍 Current state - loading:', loading, 'phase:', currentPhase);
+
   /**
    * Initialize or restore session on mount
    */
@@ -137,6 +139,7 @@ export default function SessionOrchestrator() {
 
       console.log('✅ Setting loading to false');
       setLoading(false);
+      console.log('✅ setLoading(false) COMPLETED - state should update');
     } catch (err) {
       console.error('❌ Error restoring session:', err);
       setError(`Failed to restore session: ${err.message}`);
@@ -389,6 +392,7 @@ export default function SessionOrchestrator() {
   // ========================================
 
   if (loading) {
+    console.log('🔄 Rendering loading screen (loading === true)');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -398,6 +402,8 @@ export default function SessionOrchestrator() {
       </div>
     );
   }
+
+  console.log('✅ NOT loading - rendering phase:', currentPhase);
 
   if (error) {
     return (
