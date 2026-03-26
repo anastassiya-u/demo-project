@@ -24,6 +24,13 @@ export default function OracleInterface({ caseData, onComplete }) {
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
+  // Reset state when case changes (critical for multi-case flow)
+  useEffect(() => {
+    setConfidence(null);
+    setFinalDiagnosis('');
+    setUserAgreesWithAI(null);
+  }, [caseData.id]);
+
   // Handle final diagnosis submission - MUST be defined before useEffect that uses it
   const handleSubmitFinal = useCallback(async () => {
     if (!confidence) {

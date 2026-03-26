@@ -32,6 +32,19 @@ export default function CriticInterface({ caseData, onComplete }) {
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
+  // Reset state when case changes (critical for multi-case flow)
+  useEffect(() => {
+    setHypothesis('');
+    setHypothesisSubmitted(false);
+    setConfidencePre(null);
+    setConfidencePost(null);
+    setFinalDiagnosis('');
+    setRevisedHypothesis(false);
+    setRevisionLogged(false);
+    setRevealedPanels([]);
+    setActivePanel(null);
+  }, [caseData.id]);
+
   // Evidence panels (partiality stages)
   const availablePanels = [
     { id: 'symptoms', label: 'Show Symptom Analysis', icon: '🩺' },

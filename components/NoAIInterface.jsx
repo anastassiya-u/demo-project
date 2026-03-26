@@ -18,6 +18,13 @@ export default function NoAIInterface({ caseData, onComplete }) {
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
+  // Reset state when case changes (critical for multi-case flow)
+  useEffect(() => {
+    setDiagnosis('');
+    setConfidence(null);
+    setStartTime(null);
+  }, [caseData.id]);
+
   // Define handleSubmit BEFORE useEffect that references it
   const handleSubmit = useCallback(async () => {
     if (!diagnosis || !confidence) {
