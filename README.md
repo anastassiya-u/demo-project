@@ -322,6 +322,25 @@ This platform operationalizes principles from:
 
 ---
 
+## 📚 Documentation
+
+### Getting Started
+- **[Setup Guide](docs/setup/SETUP_GUIDE.md)** - Complete local development setup instructions
+- **[Deployment Archive](docs/setup/DEPLOYMENT_ARCHIVE.md)** - Platform deployment history and process
+
+### User Guides
+- **[Interface Guide](docs/guides/INTERFACE_GUIDE.md)** - Detailed explanation of Oracle vs. Critic interfaces
+- **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - Comprehensive testing checklist and procedures
+
+### Research Documentation
+- **[Research Papers](docs/research/)** - Literature review, introduction, data collection plan, PRD
+- **[Project Constitution](CLAUDE.md)** - Theoretical foundation and implementation specifications
+
+### Scripts
+- **[scripts/](scripts/)** - Deployment, installation, and database utility scripts
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
