@@ -32,6 +32,7 @@ import CriticInterface from './CriticInterface';
 import NFCScale from './NFCScale';
 import NoAIInterface from './NoAIInterface';
 import { useNotification } from './Notification';
+import { useTranslation } from '../lib/translations';
 
 // Import cases data
 import casesData from '../src/data/cases.json';
@@ -687,6 +688,9 @@ function RegistrationForm({ onSubmit }) {
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
+  // Translations
+  const t = useTranslation(formData.language);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -700,7 +704,7 @@ function RegistrationForm({ onSubmit }) {
   const validateStudentId = async (id) => {
     if (!id || id.length < 3) {
       setStudentIdStatus('invalid');
-      setStudentIdError('ID must be at least 3 characters');
+      setStudentIdError(t.studentIdTooShort);
       return false;
     }
 
@@ -721,7 +725,7 @@ function RegistrationForm({ onSubmit }) {
 
       if (data) {
         setStudentIdStatus('duplicate');
-        setStudentIdError('This Student ID is already registered');
+        setStudentIdError(t.studentIdDuplicate);
         return false;
       }
 
@@ -731,7 +735,7 @@ function RegistrationForm({ onSubmit }) {
     } catch (err) {
       console.error('Error checking student ID:', err);
       setStudentIdStatus('invalid');
-      setStudentIdError('Unable to verify ID. Please check your connection and try again.');
+      setStudentIdError(t.studentIdCheckError);
       return false;
     }
   };
@@ -802,10 +806,10 @@ function RegistrationForm({ onSubmit }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Student ID
+          {t.studentIdLabel}
         </label>
         <p className="text-xs text-gray-600 mb-2">
-          Enter your university student ID or the research ID provided by your instructor
+          {t.studentIdHelp}
         </p>
         <div className="relative">
           <input
@@ -822,7 +826,7 @@ function RegistrationForm({ onSubmit }) {
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-gray-300 focus:ring-blue-500'
             }`}
-            placeholder="e.g., MED2024-001"
+            placeholder={t.studentIdPlaceholder}
           />
           {studentIdStatus === 'checking' && (
             <span className="absolute right-3 top-3.5 text-gray-400">⌛</span>
@@ -841,7 +845,7 @@ function RegistrationForm({ onSubmit }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Age</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t.ageLabel}</label>
           <input
             type="number"
             name="age"
@@ -851,11 +855,12 @@ function RegistrationForm({ onSubmit }) {
             min="18"
             max="65"
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder={t.agePlaceholder}
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Gender
+            {t.genderLabel}
           </label>
           <select
             name="gender"
@@ -864,16 +869,16 @@ function RegistrationForm({ onSubmit }) {
             required
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Select...</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
+            <option value="">{t.genderSelect}</option>
+            <option value="Male">{t.genderMale}</option>
+            <option value="Female">{t.genderFemale}</option>
           </select>
         </div>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Medical School
+          {t.medicalSchoolLabel}
         </label>
         <input
           type="text"
@@ -882,13 +887,13 @@ function RegistrationForm({ onSubmit }) {
           onChange={handleChange}
           required
           className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., Astana Medical University"
+          placeholder={t.medicalSchoolPlaceholder}
         />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Year of Study
+          {t.yearLabel}
         </label>
         <select
           name="yearOfStudy"
@@ -897,21 +902,20 @@ function RegistrationForm({ onSubmit }) {
           required
           className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">Select...</option>
-          {[1, 2, 3, 4, 5, 6].map((year) => (
-            <option key={year} value={year}>
-              Year {year}
-            </option>
-          ))}
+          <option value="">{t.genderSelect}</option>
+          <option value="1">{t.year1}</option>
+          <option value="2">{t.year2}</option>
+          <option value="3">{t.year3}</option>
+          <option value="4">{t.year4}</option>
+          <option value="5">{t.year5}</option>
+          <option value="6">{t.year6}</option>
         </select>
       </div>
 
       <div className="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-200">
-        <h3 className="font-bold text-gray-800 mb-3">Informed Consent</h3>
+        <h3 className="font-bold text-gray-800 mb-3">{t.consentHeading}</h3>
         <p className="text-sm text-gray-700 mb-4 leading-relaxed">
-          I understand that this study involves diagnosing clinical cases with AI
-          assistance. I consent to participate and understand that my data will be
-          anonymized and used for research purposes. I can withdraw at any time.
+          {t.consentText}
         </p>
         <label className="flex items-center gap-3">
           <input
@@ -921,7 +925,7 @@ function RegistrationForm({ onSubmit }) {
             className="w-5 h-5"
           />
           <span className="text-sm font-medium text-gray-800">
-            I have read and agree to the informed consent
+            {t.consentCheckbox}
           </span>
         </label>
       </div>
@@ -935,7 +939,7 @@ function RegistrationForm({ onSubmit }) {
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
         }`}
       >
-        Begin Experiment
+        {t.beginButton}
       </button>
     </form>
     </>
