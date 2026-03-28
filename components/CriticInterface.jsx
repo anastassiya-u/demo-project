@@ -95,6 +95,7 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
           userHypothesis: hypothesis,
           accuracyLevel: accuracyLevel || 'high',
           isFoilCase: caseData.isFoil || false,
+          language: language, // Pass UI language for detection fallback
         }),
       });
 

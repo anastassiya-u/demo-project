@@ -11,7 +11,7 @@ export async function POST(request) {
   try {
     // Parse request body
     const body = await request.json();
-    const { caseData, userHypothesis, accuracyLevel, isFoilCase } = body;
+    const { caseData, userHypothesis, accuracyLevel, isFoilCase, language } = body;
 
     // Validate required fields
     if (!caseData || !userHypothesis || !accuracyLevel) {
@@ -25,6 +25,7 @@ export async function POST(request) {
       hypothesis: userHypothesis,
       accuracyLevel,
       isFoilCase,
+      uiLanguage: language,
     });
 
     // Call AI evaluator (server-side only - AWS credentials not exposed)
@@ -33,6 +34,7 @@ export async function POST(request) {
       userHypothesis,
       accuracyLevel,
       isFoilCase,
+      uiLanguage: language, // Pass UI language as hint
     });
 
     return NextResponse.json(evaluation);
