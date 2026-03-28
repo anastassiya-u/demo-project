@@ -66,7 +66,6 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
     { id: 'symptoms', label: t.showSymptomAnalysis, icon: '🩺' },
     { id: 'labs', label: t.showLabResults, icon: '🧪' },
     { id: 'vitals', label: t.showVitalSigns, icon: '📈' },
-    { id: 'differential', label: t.showDifferential, icon: '🔬' },
   ];
 
   // Handle hypothesis submission - MUST be defined before useEffect that uses it
@@ -488,47 +487,6 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
                           ? '* Динамические данные за 24 часа не зафиксированы в данном клиническом случае'
                           : '* 24-hour trend data not recorded for this case'}
                       </p>
-                    </div>
-                  )}
-                  {panelId === 'differential' && (
-                    <div>
-                      {(language === 'ru' && caseData.differentialComparison_ru) || caseData.differentialComparison ? (
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-gray-100">
-                              <th className="p-2 text-left">{t.diagnosisColumn}</th>
-                              <th className="p-2 text-left">{t.matchColumn}</th>
-                              <th className="p-2 text-left">{t.keyDifferentiatorColumn}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {((language === 'ru' && caseData.differentialComparison_ru)
-                              ? caseData.differentialComparison_ru
-                              : caseData.differentialComparison
-                            )?.map((item, idx) => (
-                              <tr key={idx} className="border-t">
-                                <td className="p-2 font-medium">{item.diagnosis}</td>
-                                <td className="p-2">
-                                  <span className={`px-2 py-1 rounded ${
-                                    parseInt(item.match) >= 80 ? 'bg-green-100 text-green-800' :
-                                    parseInt(item.match) >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-red-100 text-red-800'
-                                  }`}>
-                                    {item.match}
-                                  </span>
-                                </td>
-                                <td className="p-2 text-gray-700">{item.differentiator}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <p className="text-gray-500 italic text-sm">
-                          {language === 'ru'
-                            ? 'Дифференциальный диагноз недоступен для данного случая'
-                            : 'Differential diagnosis unavailable for this case'}
-                        </p>
-                      )}
                     </div>
                   )}
                   {panelId === 'symptoms' && (
