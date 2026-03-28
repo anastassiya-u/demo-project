@@ -63,10 +63,10 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
 
   // Evidence panels (partiality stages)
   const availablePanels = [
-    { id: 'symptoms', label: 'Show Symptom Analysis', icon: '🩺' },
-    { id: 'labs', label: 'Show Lab Results', icon: '🧪' },
-    { id: 'vitals', label: 'Show Vital Signs History', icon: '📈' },
-    { id: 'differential', label: 'Compare Differential Diagnosis', icon: '🔬' },
+    { id: 'symptoms', label: t.showSymptomAnalysis, icon: '🩺' },
+    { id: 'labs', label: t.showLabResults, icon: '🧪' },
+    { id: 'vitals', label: t.showVitalSigns, icon: '📈' },
+    { id: 'differential', label: t.showDifferential, icon: '🔬' },
   ];
 
   // Handle hypothesis submission - MUST be defined before useEffect that uses it
@@ -251,13 +251,13 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
             <strong>{t.physicalExam}:</strong> {getCaseField(caseData, 'physicalExam', language)}
           </p>
           <div className="bg-gray-50 p-4 rounded border border-gray-200">
-            <strong className="block mb-2">Vital Signs:</strong>
+            <strong className="block mb-2">{t.vitalSigns}:</strong>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <span>Temp: {caseData.vitals.temperature}</span>
-              <span>BP: {caseData.vitals.bloodPressure}</span>
-              <span>HR: {caseData.vitals.heartRate}</span>
-              <span>RR: {caseData.vitals.respiratoryRate}</span>
-              <span>O₂ Sat: {caseData.vitals.oxygenSaturation}</span>
+              <span>{t.temp}: {caseData.vitals.temperature}</span>
+              <span>{t.bp}: {caseData.vitals.bloodPressure}</span>
+              <span>{t.hr}: {caseData.vitals.heartRate}</span>
+              <span>{t.rr}: {caseData.vitals.respiratoryRate}</span>
+              <span>{t.o2sat}: {caseData.vitals.oxygenSaturation}</span>
             </div>
           </div>
         </div>
@@ -447,10 +447,10 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
                   {panelId === 'vitals' && (
                     <div>
                       <p className="mb-2">
-                        <strong>Trend over last 24 hours:</strong>
+                        <strong>{t.trendOver24h}</strong>
                       </p>
                       <p className="text-xs text-gray-600">
-                        [Chart would show temperature, BP, HR trends here]
+                        {t.chartPlaceholder}
                       </p>
                     </div>
                   )}
@@ -458,9 +458,9 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="p-2 text-left">Diagnosis</th>
-                          <th className="p-2 text-left">Match</th>
-                          <th className="p-2 text-left">Key Differentiator</th>
+                          <th className="p-2 text-left">{t.diagnosisColumn}</th>
+                          <th className="p-2 text-left">{t.matchColumn}</th>
+                          <th className="p-2 text-left">{t.keyDifferentiatorColumn}</th>
                         </tr>
                       </thead>
                       <tbody>

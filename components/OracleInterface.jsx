@@ -130,13 +130,13 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
             <strong>{t.physicalExam}:</strong> {getCaseField(caseData, 'physicalExam', language)}
           </p>
           <div className="bg-gray-50 p-4 rounded border border-gray-200">
-            <strong className="block mb-2">Vital Signs:</strong>
+            <strong className="block mb-2">{t.vitalSigns}:</strong>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <span>Temp: {caseData.vitals.temperature}</span>
-              <span>BP: {caseData.vitals.bloodPressure}</span>
-              <span>HR: {caseData.vitals.heartRate}</span>
-              <span>RR: {caseData.vitals.respiratoryRate}</span>
-              <span>O₂ Sat: {caseData.vitals.oxygenSaturation}</span>
+              <span>{t.temp}: {caseData.vitals.temperature}</span>
+              <span>{t.bp}: {caseData.vitals.bloodPressure}</span>
+              <span>{t.hr}: {caseData.vitals.heartRate}</span>
+              <span>{t.rr}: {caseData.vitals.respiratoryRate}</span>
+              <span>{t.o2sat}: {caseData.vitals.oxygenSaturation}</span>
             </div>
           </div>
         </div>
