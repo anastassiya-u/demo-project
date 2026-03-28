@@ -65,6 +65,7 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
   const availablePanels = [
     { id: 'symptoms', label: t.showSymptomAnalysis, icon: '🩺' },
     { id: 'labs', label: t.showLabResults, icon: '🧪' },
+    { id: 'imaging', label: t.showImagingStudies, icon: '🔬' },
     { id: 'vitals', label: t.showVitalSigns, icon: '📈' },
   ];
 
@@ -487,6 +488,26 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
                           ? '* Динамические данные за 24 часа не зафиксированы в данном клиническом случае'
                           : '* 24-hour trend data not recorded for this case'}
                       </p>
+                    </div>
+                  )}
+                  {panelId === 'imaging' && (
+                    <div className="space-y-3">
+                      <p className="font-semibold text-gray-800 mb-2">
+                        {t.imagingResults}
+                      </p>
+                      {(caseData.imaging || caseData.imaging_ru) ? (
+                        <div className="bg-gray-50 p-4 rounded border border-gray-300">
+                          <p className="text-gray-800 text-sm leading-relaxed">
+                            {getCaseField(caseData, 'imaging', language)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic text-sm">
+                          {language === 'ru'
+                            ? 'Данные визуализации недоступны для данного случая'
+                            : 'Imaging data unavailable for this case'}
+                        </p>
+                      )}
                     </div>
                   )}
                   {panelId === 'symptoms' && (
