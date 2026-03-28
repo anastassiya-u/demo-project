@@ -83,8 +83,8 @@ export default function NoAIInterface({ caseData, onComplete, language = 'ru' })
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.clinicalCase}</h2>
         <div className="space-y-3 text-gray-700">
           <p>
-            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)},{' '}
-            {getPatientEthnicity(caseData.patient, language)}
+            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)}
+            {getPatientEthnicity(caseData.patient, language) && `, ${getPatientEthnicity(caseData.patient, language)}`}
           </p>
           <p>
             <strong>{t.chiefComplaint}:</strong> {getCaseField(caseData, 'chiefComplaint', language)}

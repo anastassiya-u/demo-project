@@ -117,8 +117,8 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.clinicalCase}</h2>
         <div className="space-y-3 text-gray-700">
           <p>
-            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)},{' '}
-            {getPatientEthnicity(caseData.patient, language)}
+            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)}
+            {getPatientEthnicity(caseData.patient, language) && `, ${getPatientEthnicity(caseData.patient, language)}`}
           </p>
           <p>
             <strong>{t.chiefComplaint}:</strong> {getCaseField(caseData, 'chiefComplaint', language)}
@@ -176,7 +176,10 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
               {t.clinicalEvidence}
             </h4>
             <ul className="space-y-3">
-              {caseData.supportingEvidence.map((item, idx) => (
+              {((language === 'ru' && caseData.supportingEvidence_ru)
+                ? caseData.supportingEvidence_ru
+                : caseData.supportingEvidence
+              ).map((item, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <span className="text-blue-600 text-xl mt-0.5">✓</span>
                   <span className="text-gray-800">{item}</span>
@@ -230,7 +233,9 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
               {t.clinicalReasoning}
             </h4>
             <p className="text-gray-800 leading-relaxed">
-              {caseData.clinicalReasoning}
+              {(language === 'ru' && caseData.clinicalReasoning_ru)
+                ? caseData.clinicalReasoning_ru
+                : caseData.clinicalReasoning}
             </p>
           </div>
         </div>

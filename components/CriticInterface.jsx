@@ -120,16 +120,24 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
       console.error('Failed to generate dynamic evidence:', error);
       showNotification('AI evaluation in progress... Using fallback evidence.', 'info', 3000);
 
-      // Fallback to static evidence if API fails
+      // Fallback to static evidence if API fails (use Russian if available)
+      const fallbackSupporting = language === 'ru' && caseData.contrastiveEvidence_ru
+        ? caseData.contrastiveEvidence_ru.supporting
+        : (caseData.contrastiveEvidence?.supporting || [
+            'Dynamic evidence generation is temporarily unavailable.',
+            'Please review the case data carefully.',
+          ]);
+
+      const fallbackChallenging = language === 'ru' && caseData.contrastiveEvidence_ru
+        ? caseData.contrastiveEvidence_ru.challenging
+        : (caseData.contrastiveEvidence?.challenging || [
+            'Consider alternative diagnoses based on clinical presentation.',
+          ]);
+
       setDynamicEvidence({
-        supporting: caseData.contrastiveEvidence?.supporting || [
-          'Dynamic evidence generation is temporarily unavailable.',
-          'Please review the case data carefully.',
-        ],
-        challenging: caseData.contrastiveEvidence?.challenging || [
-          'Consider alternative diagnoses based on clinical presentation.',
-        ],
-        aiRecommendation: caseData.aiRecommendation,
+        supporting: fallbackSupporting,
+        challenging: fallbackChallenging,
+        aiRecommendation: getCaseField(caseData, 'aiRecommendation', language) || caseData.aiRecommendation,
         fallback: true,
       });
 
@@ -230,8 +238,8 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
         <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.clinicalCase}</h2>
         <div className="space-y-3 text-gray-700">
           <p>
-            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)},{' '}
-            {getPatientEthnicity(caseData.patient, language)}
+            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)}
+            {getPatientEthnicity(caseData.patient, language) && `, ${getPatientEthnicity(caseData.patient, language)}`}
           </p>
           <p>
             <strong>{t.chiefComplaint}:</strong> {getCaseField(caseData, 'chiefComplaint', language)}
