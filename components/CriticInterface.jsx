@@ -431,16 +431,16 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
                   {panelId === 'labs' && (
                     <div className="space-y-2">
                       <p>
-                        <strong>WBC:</strong> {caseData.labs?.wbc || 'Pending'}
+                        <strong>{t.wbc}:</strong> {caseData.labs?.wbc || 'Pending'}
                       </p>
                       <p>
-                        <strong>Hemoglobin:</strong> {caseData.labs?.hemoglobin || 'Pending'}
+                        <strong>{t.hemoglobin}:</strong> {caseData.labs?.hemoglobin || 'Pending'}
                       </p>
                       <p>
-                        <strong>Platelets:</strong> {caseData.labs?.platelets || 'Pending'}
+                        <strong>{t.platelets}:</strong> {caseData.labs?.platelets || 'Pending'}
                       </p>
                       <p>
-                        <strong>CRP:</strong> {caseData.labs?.crp || 'Pending'}
+                        <strong>{t.crp}:</strong> {caseData.labs?.crp || 'Pending'}
                       </p>
                     </div>
                   )}

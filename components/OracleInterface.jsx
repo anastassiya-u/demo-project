@@ -199,19 +199,19 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
               </h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <span className="font-medium text-gray-700">WBC:</span>{' '}
+                  <span className="font-medium text-gray-700">{t.wbc}:</span>{' '}
                   <span className="text-gray-900">{caseData.labs.wbc}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">Hemoglobin:</span>{' '}
+                  <span className="font-medium text-gray-700">{t.hemoglobin}:</span>{' '}
                   <span className="text-gray-900">{caseData.labs.hemoglobin}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">Platelets:</span>{' '}
+                  <span className="font-medium text-gray-700">{t.platelets}:</span>{' '}
                   <span className="text-gray-900">{caseData.labs.platelets}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">CRP:</span>{' '}
+                  <span className="font-medium text-gray-700">{t.crp}:</span>{' '}
                   <span className="text-gray-900">{caseData.labs.crp}</span>
                 </div>
               </div>

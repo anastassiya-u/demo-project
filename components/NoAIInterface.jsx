@@ -111,14 +111,18 @@ export default function NoAIInterface({ caseData, onComplete, language = 'ru' })
             <div className="bg-gray-50 p-4 rounded border border-gray-200 mt-3">
               <strong className="block mb-2">{t.laboratoryResults}:</strong>
               <div className="text-sm space-y-1">
-                {Object.entries(caseData.labs).map(([key, value]) => (
-                  <p key={key}>
-                    <span className="font-medium capitalize">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}:
-                    </span>{' '}
-                    {value}
-                  </p>
-                ))}
+                {Object.entries(caseData.labs).map(([key, value]) => {
+                  // Map lab keys to translation keys
+                  const labName = t[key] || key.replace(/([A-Z])/g, ' $1').trim();
+                  return (
+                    <p key={key}>
+                      <span className="font-medium">
+                        {labName}:
+                      </span>{' '}
+                      {value}
+                    </p>
+                  );
+                })}
               </div>
             </div>
           )}
