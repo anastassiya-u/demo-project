@@ -96,7 +96,7 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
   const handleAgreeWithAI = (agrees) => {
     setUserAgreesWithAI(agrees);
     if (agrees) {
-      setFinalDiagnosis(caseData.aiRecommendation);
+      setFinalDiagnosis(getCaseField(caseData, 'aiRecommendation', language));
     } else {
       setFinalDiagnosis(''); // User must enter alternative
     }
@@ -155,7 +155,9 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
         </div>
 
         <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border-2 border-white/30">
-          <p className="text-4xl font-bold mb-2">{caseData.aiRecommendation}</p>
+          <p className="text-4xl font-bold mb-2">
+            {getCaseField(caseData, 'aiRecommendation', language)}
+          </p>
           <p className="text-blue-100 text-sm">
             {t.basedOnClinical}
           </p>
@@ -257,7 +259,7 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
                 className="flex-1 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
               >
                 <span>✓</span>
-                <span>{t.agree} {caseData.aiRecommendation}</span>
+                <span>{t.agree} {getCaseField(caseData, 'aiRecommendation', language)}</span>
               </button>
               <button
                 onClick={() => handleAgreeWithAI(false)}
@@ -274,7 +276,7 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
         {userAgreesWithAI === false && (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              {t.aiRecommended} <span className="font-medium">{caseData.aiRecommendation}</span>
+              {t.aiRecommended} <span className="font-medium">{getCaseField(caseData, 'aiRecommendation', language)}</span>
             </p>
             <textarea
               value={finalDiagnosis}
