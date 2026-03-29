@@ -23,7 +23,6 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
   // UI State
   const [confidence, setConfidence] = useState(null);
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
-  const [userAgreesWithAI, setUserAgreesWithAI] = useState(null);
 
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
@@ -36,7 +35,6 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
   useEffect(() => {
     setConfidence(null);
     setFinalDiagnosis('');
-    setUserAgreesWithAI(null);
     caseInitialized.current = false;
     currentCaseId.current = null;
   }, [caseData.id]);
@@ -91,16 +89,6 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [caseData, confidence, finalDiagnosis, handleSubmitFinal]);
-
-  // Handle agreement with AI
-  const handleAgreeWithAI = (agrees) => {
-    setUserAgreesWithAI(agrees);
-    if (agrees) {
-      setFinalDiagnosis(getCaseField(caseData, 'aiRecommendation', language));
-    } else {
-      setFinalDiagnosis(''); // User must enter alternative
-    }
-  };
 
   // Handle confidence rating
   const handleConfidenceRating = async (rating) => {
@@ -245,93 +233,59 @@ export default function OracleInterface({ caseData, onComplete, language = 'ru' 
 
       {/* USER DECISION */}
       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-300">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">{t.yourDecision}</h3>
+        <h3 className="text-xl font-bold text-gray-800 mb-1">{t.yourFinalDiagnosisLabel}</h3>
+        <p className="text-sm text-gray-500 mb-5">
+          {language === 'ru'
+            ? 'Ознакомившись с рекомендацией ИИ, введите ваш окончательный диагноз вручную.'
+            : 'After reviewing the AI recommendation above, type your final diagnosis below.'}
+        </p>
 
-        {/* Agreement Options */}
-        {userAgreesWithAI === null && (
-          <div className="space-y-4">
-            <p className="text-gray-700">
-              {t.doYouAgree}
-            </p>
-            <div className="flex gap-4">
-              <button
-                onClick={() => handleAgreeWithAI(true)}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition flex items-center justify-center gap-2"
-              >
-                <span>✓</span>
-                <span>{t.agree} {getCaseField(caseData, 'aiRecommendation', language)}</span>
-              </button>
-              <button
-                onClick={() => handleAgreeWithAI(false)}
-                className="flex-1 py-4 bg-gray-600 text-white rounded-lg font-bold text-lg hover:bg-gray-700 transition flex items-center justify-center gap-2"
-              >
-                <span>✗</span>
-                <span>{t.disagree}</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* If User Disagrees - Enter Alternative Diagnosis */}
-        {userAgreesWithAI === false && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              {t.aiRecommended} <span className="font-medium">{getCaseField(caseData, 'aiRecommendation', language)}</span>
-            </p>
-            <textarea
-              value={finalDiagnosis}
-              onChange={(e) => setFinalDiagnosis(e.target.value)}
-              placeholder={t.enterAlternative}
-              className="w-full p-4 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-lg"
-              rows={2}
-            />
-          </div>
-        )}
+        <textarea
+          value={finalDiagnosis}
+          onChange={(e) => setFinalDiagnosis(e.target.value)}
+          placeholder={t.typeFinalDiagnosis}
+          className="w-full p-4 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg resize-none"
+          rows={2}
+        />
 
         {/* Confidence Rating */}
-        {userAgreesWithAI !== null && (
-          <>
-            <div className="mt-6">
-              <p className="text-sm text-gray-600 mb-2">
-                {t.howConfident}
-              </p>
-              <div className="flex gap-2">
-                {[
-                  { num: 1, label: t.veryLow },
-                  { num: 2, label: t.low },
-                  { num: 3, label: t.moderate },
-                  { num: 4, label: t.high },
-                  { num: 5, label: t.veryHigh },
-                ].map((item) => (
-                  <button
-                    key={item.num}
-                    onClick={() => handleConfidenceRating(item.num)}
-                    className={`flex-1 px-2 py-2 rounded-lg font-medium transition ${
-                      confidence === item.num
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    <div className="text-lg">{item.num}</div>
-                    <div className="text-xs">{item.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+        <div className="mt-5">
+          <p className="text-sm text-gray-600 mb-2">{t.howConfident}</p>
+          <div className="flex gap-2">
+            {[
+              { num: 1, label: t.veryLow },
+              { num: 2, label: t.low },
+              { num: 3, label: t.moderate },
+              { num: 4, label: t.high },
+              { num: 5, label: t.veryHigh },
+            ].map((item) => (
+              <button
+                key={item.num}
+                onClick={() => handleConfidenceRating(item.num)}
+                className={`flex-1 px-2 py-2 rounded-lg font-medium transition ${
+                  confidence === item.num
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <div className="text-lg">{item.num}</div>
+                <div className="text-xs">{item.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
 
-            <button
-              onClick={handleSubmitFinal}
-              disabled={!confidence || !finalDiagnosis}
-              className={`mt-6 w-full py-4 rounded-lg font-bold text-lg transition ${
-                confidence && finalDiagnosis
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Submit Final Diagnosis →
-            </button>
-          </>
-        )}
+        <button
+          onClick={handleSubmitFinal}
+          disabled={!confidence || finalDiagnosis.trim().length < 3}
+          className={`mt-6 w-full py-4 rounded-lg font-bold text-lg transition ${
+            confidence && finalDiagnosis.trim().length >= 3
+              ? 'bg-green-600 text-white hover:bg-green-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {t.submitFinalDiagnosisButton} → <span className="text-sm font-normal opacity-75">(Ctrl+Enter)</span>
+        </button>
       </div>
 
       {/* Design Note: Oracle shows AI as authoritative source */}

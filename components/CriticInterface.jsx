@@ -1,11 +1,11 @@
 /**
  * CriticInterface Component (Evaluative AI)
- * Implements hypothesis-driven evaluation with progressive evidence reveal
+ * Implements hypothesis comparison table with progressive evidence reveal
  *
  * Key Features:
- * - Mandatory hypothesis input (blocks AI output)
- * - Contrastive evidence structure (FOR / AGAINST)
+ * - Hypothesis comparison table (3 AI hypotheses + optional user row)
  * - Progressive reveal (partiality mechanism - de Jong et al., 2025)
+ * - Mandatory typed final answer (equalizes effort with Oracle)
  * - SDT logging integration (Autonomy, Competence)
  */
 
@@ -18,45 +18,35 @@ import { useTranslation } from '../lib/translations';
 import { getCaseField, getPatientGender, getPatientEthnicity } from '../lib/case-field-helper';
 
 export default function CriticInterface({ caseData, onComplete, accuracyLevel, language = 'ru' }) {
-  // Get translations
   const t = useTranslation(language);
-  // UI State
-  const [hypothesis, setHypothesis] = useState('');
-  const [hypothesisSubmitted, setHypothesisSubmitted] = useState(false);
-  const [confidencePre, setConfidencePre] = useState(null);
-  const [confidencePost, setConfidencePost] = useState(null);
-  const [finalDiagnosis, setFinalDiagnosis] = useState('');
-  const [revisedHypothesis, setRevisedHypothesis] = useState(false);
-  const [revisionLogged, setRevisionLogged] = useState(false);
 
-  // AI Evaluation State (NEW - for dynamic evidence)
-  const [dynamicEvidence, setDynamicEvidence] = useState(null);
-  const [loadingEvidence, setLoadingEvidence] = useState(false);
+  // User's optional hypothesis row
+  const [userRowHypothesis, setUserRowHypothesis] = useState('');
+  const [userRowEvidence, setUserRowEvidence] = useState(null);
+  const [generatingUserRow, setGeneratingUserRow] = useState(false);
+
+  // Final answer (mandatory)
+  const [finalDiagnosis, setFinalDiagnosis] = useState('');
+  const [confidence, setConfidence] = useState(null);
 
   // Progressive Reveal State
   const [revealedPanels, setRevealedPanels] = useState([]);
-  const [activePanel, setActivePanel] = useState(null);
 
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
 
-  // Track if case has been initialized (prevent duplicate logging)
+  // Prevent duplicate case initialization
   const caseInitialized = useRef(false);
   const currentCaseId = useRef(null);
 
-  // Reset state when case changes (critical for multi-case flow)
+  // Reset all state when case changes
   useEffect(() => {
-    setHypothesis('');
-    setHypothesisSubmitted(false);
-    setConfidencePre(null);
-    setConfidencePost(null);
+    setUserRowHypothesis('');
+    setUserRowEvidence(null);
+    setGeneratingUserRow(false);
     setFinalDiagnosis('');
-    setRevisedHypothesis(false);
-    setRevisionLogged(false);
-    setDynamicEvidence(null);
-    setLoadingEvidence(false);
+    setConfidence(null);
     setRevealedPanels([]);
-    setActivePanel(null);
     caseInitialized.current = false;
     currentCaseId.current = null;
   }, [caseData.id]);
@@ -69,231 +59,408 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
     { id: 'vitals', label: t.showVitalSigns, icon: '📈' },
   ];
 
-  // Handle hypothesis submission - MUST be defined before useEffect that uses it
-  const handleSubmitHypothesis = useCallback(async () => {
-    if (hypothesis.length < 3) {
-      showNotification(t.enterDiagnosisWarning, 'warning');
-      return;
-    }
+  // Pre-filled hypotheses from case data
+  const suggestedHypotheses = caseData.suggestedHypotheses || [];
 
-    setHypothesisSubmitted(true);
-    await logger.submitHypothesis(hypothesis);
-
-    // Generate dynamic evidence using GPT-4 (via secure API route)
-    setLoadingEvidence(true);
+  // Generate arguments for optional user row
+  const handleGenerateUserRow = useCallback(async () => {
+    if (userRowHypothesis.trim().length < 3) return;
+    setGeneratingUserRow(true);
     try {
-      console.log('🤖 Requesting AI evaluation for hypothesis:', hypothesis);
-
-      // Call server-side API route (protects AWS credentials)
-      const response = await fetch('/api/evaluate-hypothesis', {
+      const res = await fetch('/api/evaluate-hypothesis', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           caseData,
-          userHypothesis: hypothesis,
+          userHypothesis: userRowHypothesis.trim(),
           accuracyLevel: accuracyLevel || 'high',
           isFoilCase: caseData.isFoil || false,
-          language: language, // Pass UI language for detection fallback
+          language,
         }),
       });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+      const data = await res.json();
+      if (data.evaluation) {
+        setUserRowEvidence({
+          argsFor: data.evaluation.evidenceFor || data.evaluation.supporting || [],
+          argsAgainst: data.evaluation.evidenceAgainst || data.evaluation.challenging || [],
+        });
+        await logger.submitHypothesis(userRowHypothesis.trim());
       }
-
-      const evidence = await response.json();
-      setDynamicEvidence(evidence);
-
-      // Log AI output viewed (for Critic, this happens after hypothesis)
-      await logger.viewAIOutput(
-        evidence.aiRecommendation || caseData.aiRecommendation,
-        caseData.correctDiagnosis,
-        evidence.isFoil || caseData.isFoil
-      );
-
-      console.log('✅ Dynamic evidence generated:', {
-        supporting: evidence.supporting.length,
-        challenging: evidence.challenging.length,
-      });
-    } catch (error) {
-      console.error('Failed to generate dynamic evidence:', error);
-      showNotification('AI evaluation in progress... Using fallback evidence.', 'info', 3000);
-
-      // Fallback to static evidence if API fails (use Russian if available)
-      const fallbackSupporting = language === 'ru' && caseData.contrastiveEvidence_ru
-        ? caseData.contrastiveEvidence_ru.supporting
-        : (caseData.contrastiveEvidence?.supporting || [
-            'Dynamic evidence generation is temporarily unavailable.',
-            'Please review the case data carefully.',
-          ]);
-
-      const fallbackChallenging = language === 'ru' && caseData.contrastiveEvidence_ru
-        ? caseData.contrastiveEvidence_ru.challenging
-        : (caseData.contrastiveEvidence?.challenging || [
-            'Consider alternative diagnoses based on clinical presentation.',
-          ]);
-
-      setDynamicEvidence({
-        supporting: fallbackSupporting,
-        challenging: fallbackChallenging,
-        aiRecommendation: getCaseField(caseData, 'aiRecommendation', language) || caseData.aiRecommendation,
-        fallback: true,
-      });
-
-      // Still log AI output even with fallback
-      await logger.viewAIOutput(
-        caseData.aiRecommendation,
-        caseData.correctDiagnosis,
-        caseData.isFoil
-      );
+    } catch (err) {
+      showNotification(language === 'ru' ? 'Ошибка генерации аргументов' : 'Error generating arguments', 'error');
     } finally {
-      setLoadingEvidence(false);
+      setGeneratingUserRow(false);
     }
-  }, [hypothesis, showNotification, caseData, accuracyLevel]);
-
-  // Handle final diagnosis submission - MUST be defined before useEffect that uses it
-  const handleSubmitFinal = useCallback(async () => {
-    if (!confidencePost) {
-      showNotification(t.rateConfidenceWarningFinal, 'warning');
-      return;
-    }
-
-    const diagnosisToSubmit = revisedHypothesis ? finalDiagnosis : hypothesis;
-
-    // Log revision only once
-    if (revisedHypothesis && finalDiagnosis !== hypothesis && !revisionLogged) {
-      await logger.reviseHypothesis(
-        finalDiagnosis,
-        'User revised after seeing contrastive evidence'
-      );
-      setRevisionLogged(true);
-    }
-
-    await logger.submitFinalDiagnosis(diagnosisToSubmit);
-    onComplete();
-  }, [confidencePost, revisedHypothesis, finalDiagnosis, hypothesis, revisionLogged, showNotification, onComplete]);
-
-  // Initialize case
-  useEffect(() => {
-    // Prevent duplicate initialization on re-renders
-    if (!caseInitialized.current || currentCaseId.current !== caseData.id) {
-      caseInitialized.current = true;
-      currentCaseId.current = caseData.id;
-      logger.startCase(caseData.id, caseData.order);
-    }
-
-    // Keyboard shortcuts
-    const handleKeyPress = (e) => {
-      // Enter key to submit (if ready)
-      if (e.key === 'Enter' && e.ctrlKey) {
-        if (!hypothesisSubmitted && hypothesis && confidencePre) {
-          handleSubmitHypothesis();
-        } else if (hypothesisSubmitted && confidencePost) {
-          handleSubmitFinal();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [caseData, hypothesisSubmitted, hypothesis, confidencePre, confidencePost, handleSubmitHypothesis, handleSubmitFinal]);
+  }, [userRowHypothesis, caseData, accuracyLevel, language, showNotification]);
 
   // Handle evidence panel reveal
   const handleRevealPanel = async (panelId) => {
     if (revealedPanels.includes(panelId)) {
-      // Close panel
-      setActivePanel(null);
+      setRevealedPanels(revealedPanels.filter((id) => id !== panelId));
       await logger.closeEvidencePanel(panelId);
     } else {
-      // Open panel
       setRevealedPanels([...revealedPanels, panelId]);
-      setActivePanel(panelId);
       await logger.openEvidencePanel(panelId);
     }
   };
 
-  // Handle confidence rating
-  const handleConfidenceRating = async (rating, stage) => {
-    if (stage === 'pre') {
-      setConfidencePre(rating);
-    } else {
-      setConfidencePost(rating);
+  // Submit final diagnosis
+  const handleSubmitFinal = useCallback(async () => {
+    if (!confidence) {
+      showNotification(t.rateConfidenceWarning, 'warning');
+      return;
     }
-    await logger.rateConfidence(rating, stage);
-  };
+    if (!finalDiagnosis || finalDiagnosis.trim().length < 3) {
+      showNotification(t.enterDiagnosisWarning, 'warning');
+      return;
+    }
+    await logger.rateConfidence(confidence, 'post');
+    await logger.submitFinalDiagnosis(finalDiagnosis.trim());
+    onComplete();
+  }, [confidence, finalDiagnosis, showNotification, onComplete, t]);
 
-  // Handle hypothesis revision
-  const handleReviseHypothesis = () => {
-    setRevisedHypothesis(true);
-    setFinalDiagnosis(hypothesis); // Pre-fill with original
+  // Initialize case
+  useEffect(() => {
+    if (caseInitialized.current && currentCaseId.current === caseData.id) return;
+    caseInitialized.current = true;
+    currentCaseId.current = caseData.id;
+
+    logger.startCase(caseData.id, caseData.order);
+    // AI hypotheses shown immediately (no single recommendation — log foil/correct diagnosis)
+    logger.viewAIOutput(
+      caseData.isFoil ? caseData.foilDiagnosis : caseData.correctDiagnosis,
+      caseData.correctDiagnosis,
+      caseData.isFoil || false
+    );
+
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter' && e.ctrlKey && confidence && finalDiagnosis.trim().length >= 3) {
+        handleSubmitFinal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [caseData, confidence, finalDiagnosis, handleSubmitFinal]);
+
+  // Helper: get localized field from hypothesis object
+  const getHypothesisField = (h, field) => {
+    if (language === 'ru' && h[`${field}_ru`]) return h[`${field}_ru`];
+    return h[field] || '';
   };
 
   return (
     <>
       {NotificationComponent}
       <div className="max-w-5xl mx-auto p-6 space-y-6">
-      {/* Case Presentation */}
-      <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.clinicalCase}</h2>
-        <div className="space-y-3 text-gray-700">
-          <p>
-            <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)}
-            {getPatientEthnicity(caseData.patient, language) && `, ${getPatientEthnicity(caseData.patient, language)}`}
-          </p>
-          <p>
-            <strong>{t.chiefComplaint}:</strong> {getCaseField(caseData, 'chiefComplaint', language)}
-          </p>
-          <p>
-            <strong>{t.history}:</strong> {getCaseField(caseData, 'history', language)}
-          </p>
-          <p>
-            <strong>{t.physicalExam}:</strong> {getCaseField(caseData, 'physicalExam', language)}
-          </p>
-          <div className="bg-gray-50 p-4 rounded border border-gray-200">
-            <strong className="block mb-2">{t.vitalSigns}:</strong>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <span>{t.temp}: {caseData.vitals.temperature}</span>
-              <span>{t.bp}: {caseData.vitals.bloodPressure}</span>
-              <span>{t.hr}: {caseData.vitals.heartRate}</span>
-              <span>{t.rr}: {caseData.vitals.respiratoryRate}</span>
-              <span>{t.o2sat}: {caseData.vitals.oxygenSaturation}</span>
+
+        {/* Case Presentation */}
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.clinicalCase}</h2>
+          <div className="space-y-3 text-gray-700">
+            <p>
+              <strong>{t.patient}:</strong> {caseData.patient.age}{language === 'ru' ? ' лет' : 'yo'} {getPatientGender(caseData.patient, language)}
+              {getPatientEthnicity(caseData.patient, language) && `, ${getPatientEthnicity(caseData.patient, language)}`}
+            </p>
+            <p>
+              <strong>{t.chiefComplaint}:</strong> {getCaseField(caseData, 'chiefComplaint', language)}
+            </p>
+            <p>
+              <strong>{t.history}:</strong> {getCaseField(caseData, 'history', language)}
+            </p>
+            <p>
+              <strong>{t.physicalExam}:</strong> {getCaseField(caseData, 'physicalExam', language)}
+            </p>
+            <div className="bg-gray-50 p-4 rounded border border-gray-200">
+              <strong className="block mb-2">{t.vitalSigns}:</strong>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <span>{t.temp}: {caseData.vitals.temperature}</span>
+                <span>{t.bp}: {caseData.vitals.bloodPressure}</span>
+                <span>{t.hr}: {caseData.vitals.heartRate}</span>
+                <span>{t.rr}: {caseData.vitals.respiratoryRate}</span>
+                <span>{t.o2sat}: {caseData.vitals.oxygenSaturation}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* HYPOTHESIS LOCK: Must enter diagnosis first */}
-      {!hypothesisSubmitted ? (
-        <div className="bg-purple-50 rounded-lg shadow-md p-6 border-2 border-purple-300">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-4xl">💭</span>
-            <h3 className="text-xl font-bold text-purple-800">
-              {t.enterDiagnosis}
+        {/* Progressive Reveal Panels */}
+        <div className="bg-white rounded-lg shadow-md p-5 border border-gray-200">
+          <p className="text-sm font-semibold text-gray-700 mb-3">{t.revealEvidence}</p>
+          <div className="flex flex-wrap gap-3">
+            {availablePanels.map((panel) => {
+              const isRevealed = revealedPanels.includes(panel.id);
+              return (
+                <button
+                  key={panel.id}
+                  onClick={() => handleRevealPanel(panel.id)}
+                  className={`px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 text-sm ${
+                    isRevealed
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  <span>{panel.icon}</span>
+                  <span>
+                    {isRevealed
+                      ? `✓ ${panel.label.replace(/^(Show|Показать)\s+/i, '')} ${t.hideLabel}`
+                      : panel.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Revealed evidence panels */}
+          {revealedPanels.map((panelId) => (
+            <div
+              key={panelId}
+              className="mt-4 bg-indigo-50 rounded-lg p-4 border border-indigo-200 animate-fadeIn"
+            >
+              <h4 className="font-bold text-indigo-800 mb-3 flex items-center gap-2">
+                <span>{availablePanels.find((p) => p.id === panelId)?.icon}</span>
+                {availablePanels.find((p) => p.id === panelId)?.label}
+              </h4>
+              <div className="text-sm text-gray-700">
+                {panelId === 'labs' && (
+                  <div className="space-y-2">
+                    {caseData.labs ? (
+                      Object.entries(caseData.labs)
+                        .filter(([key]) => key !== 'source')
+                        .map(([key, value]) => (
+                          <p key={key}>
+                            <strong>{t[key] || key.replace(/([A-Z_])/g, ' $1').trim()}:</strong> {value}
+                          </p>
+                        ))
+                    ) : (
+                      <p className="text-gray-500 italic">{language === 'ru' ? 'Лабораторные данные недоступны' : 'Lab data unavailable'}</p>
+                    )}
+                  </div>
+                )}
+                {panelId === 'vitals' && (
+                  <div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white p-2 rounded border"><span className="text-gray-600">{t.temp}:</span> <span className="font-medium">{caseData.vitals.temperature}</span></div>
+                      <div className="bg-white p-2 rounded border"><span className="text-gray-600">{t.bp}:</span> <span className="font-medium">{caseData.vitals.bloodPressure}</span></div>
+                      <div className="bg-white p-2 rounded border"><span className="text-gray-600">{t.hr}:</span> <span className="font-medium">{caseData.vitals.heartRate}</span></div>
+                      <div className="bg-white p-2 rounded border"><span className="text-gray-600">{t.rr}:</span> <span className="font-medium">{caseData.vitals.respiratoryRate}</span></div>
+                      <div className="bg-white p-2 rounded border col-span-2"><span className="text-gray-600">{t.o2sat}:</span> <span className="font-medium">{caseData.vitals.oxygenSaturation}</span></div>
+                    </div>
+                  </div>
+                )}
+                {panelId === 'imaging' && (
+                  <div>
+                    {(caseData.imaging || caseData.imaging_ru) ? (
+                      <p className="leading-relaxed">{getCaseField(caseData, 'imaging', language)}</p>
+                    ) : (
+                      <p className="text-gray-500 italic">{language === 'ru' ? 'Данные визуализации недоступны' : 'Imaging data unavailable'}</p>
+                    )}
+                  </div>
+                )}
+                {panelId === 'symptoms' && (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="font-semibold mb-1">{language === 'ru' ? 'Основная жалоба:' : 'Chief Complaint:'}</p>
+                      <p>{getCaseField(caseData, 'chiefComplaint', language)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-1">{language === 'ru' ? 'Физикальное обследование:' : 'Physical Examination:'}</p>
+                      <p>{getCaseField(caseData, 'physicalExam', language)}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Hypothesis Comparison Table */}
+        <div className="bg-white rounded-lg shadow-md border border-purple-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <span>🧠</span>
+              {t.hypothesisComparison}
             </h3>
           </div>
-          <p className="text-gray-700 mb-3">
-            {t.beforeViewing}
-          </p>
-          <div className="bg-indigo-100 border-l-4 border-indigo-600 p-3 mb-4">
-            <p className="text-sm text-indigo-900">
-              <strong>{t.whyEnter}</strong> {t.whyExplanation}
-            </p>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-purple-50 border-b border-purple-200">
+                  <th className="px-4 py-3 text-left text-purple-800 font-semibold w-8">#</th>
+                  <th className="px-4 py-3 text-left text-purple-800 font-semibold w-1/4">{t.hypothesisColumn}</th>
+                  <th className="px-4 py-3 text-left text-green-800 font-semibold w-[37.5%]">
+                    <span className="flex items-center gap-1">✓ {t.argsForColumn}</span>
+                  </th>
+                  <th className="px-4 py-3 text-left text-red-800 font-semibold w-[37.5%]">
+                    <span className="flex items-center gap-1">✗ {t.argsAgainstColumn}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {suggestedHypotheses.length > 0 ? (
+                  suggestedHypotheses.map((h, i) => {
+                    const label = ['A', 'B', 'C'][i] || String(i + 1);
+                    const diagnosis = getHypothesisField(h, 'diagnosis');
+                    const argsFor = getHypothesisField(h, 'argsFor');
+                    const argsAgainst = getHypothesisField(h, 'argsAgainst');
+                    return (
+                      <tr key={h.id || i} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <td className="px-4 py-4 align-top">
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-100 text-purple-800 font-bold text-xs">
+                            {label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 align-top font-medium text-gray-900">
+                          {diagnosis}
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          {Array.isArray(argsFor) && argsFor.length > 0 ? (
+                            <ul className="space-y-1">
+                              {argsFor.map((arg, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5 text-gray-700">
+                                  <span className="text-green-600 mt-0.5 flex-shrink-0">•</span>
+                                  <span>{arg}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-gray-400 italic text-xs">{t.pendingMedicalData}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          {Array.isArray(argsAgainst) && argsAgainst.length > 0 ? (
+                            <ul className="space-y-1">
+                              {argsAgainst.map((arg, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5 text-gray-700">
+                                  <span className="text-red-500 mt-0.5 flex-shrink-0">•</span>
+                                  <span>{arg}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-gray-400 italic text-xs">{t.pendingMedicalData}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  /* Placeholder rows when no data yet */
+                  ['A', 'B', 'C'].map((label, i) => (
+                    <tr key={label} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <td className="px-4 py-4 align-top">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-gray-400 font-bold text-xs">
+                          {label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-40"></div>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="space-y-2">
+                          <div className="h-3 bg-gray-100 rounded animate-pulse w-full"></div>
+                          <div className="h-3 bg-gray-100 rounded animate-pulse w-4/5"></div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="space-y-2">
+                          <div className="h-3 bg-gray-100 rounded animate-pulse w-full"></div>
+                          <div className="h-3 bg-gray-100 rounded animate-pulse w-3/4"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+
+                {/* Optional user row (+) */}
+                <tr className="border-t-2 border-dashed border-purple-300 bg-purple-50">
+                  <td className="px-4 py-4 align-top">
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-600 text-white font-bold text-sm">
+                      +
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 align-top" colSpan={userRowEvidence ? 1 : 3}>
+                    <div className="space-y-2">
+                      <p className="text-xs text-purple-700 font-medium">{t.optionalHypothesisHint}</p>
+                      <textarea
+                        value={userRowHypothesis}
+                        onChange={(e) => setUserRowHypothesis(e.target.value)}
+                        placeholder={t.addYourHypothesis}
+                        className="w-full p-2 border border-purple-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 resize-none bg-white"
+                        rows={2}
+                      />
+                      {userRowHypothesis.trim().length >= 3 && !userRowEvidence && (
+                        <button
+                          onClick={handleGenerateUserRow}
+                          disabled={generatingUserRow}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                            generatingUserRow
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          }`}
+                        >
+                          {generatingUserRow ? (
+                            <span className="flex items-center gap-2">
+                              <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                              {t.generatingArguments}
+                            </span>
+                          ) : (
+                            t.generateArguments
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  {userRowEvidence && (
+                    <>
+                      <td className="px-4 py-4 align-top">
+                        <ul className="space-y-1">
+                          {userRowEvidence.argsFor.map((arg, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5 text-gray-700 text-sm">
+                              <span className="text-green-600 mt-0.5 flex-shrink-0">•</span>
+                              <span>{arg}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <ul className="space-y-1">
+                          {userRowEvidence.argsAgainst.map((arg, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5 text-gray-700 text-sm">
+                              <span className="text-red-500 mt-0.5 flex-shrink-0">•</span>
+                              <span>{arg}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              </tbody>
+            </table>
           </div>
+        </div>
+
+        {/* Final Answer Section */}
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-300">
+          <h3 className="text-xl font-bold text-gray-800 mb-1">{t.yourFinalDiagnosisLabel}</h3>
+          <p className="text-sm text-gray-500 mb-5">
+            {language === 'ru'
+              ? 'Изучив таблицу выше, введите ваш окончательный диагноз вручную.'
+              : 'After reviewing the table above, type your final diagnosis below.'}
+          </p>
 
           <textarea
-            value={hypothesis}
-            onChange={(e) => setHypothesis(e.target.value)}
-            placeholder={t.enterDiagnosisPlaceholder}
-            className="w-full p-4 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg"
-            rows={3}
+            value={finalDiagnosis}
+            onChange={(e) => setFinalDiagnosis(e.target.value)}
+            placeholder={t.typeFinalDiagnosis}
+            className="w-full p-4 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg resize-none"
+            rows={2}
           />
 
-          <div className="mt-4">
-            <p className="text-sm text-gray-600 mb-2">
-              {t.howConfidentPre}
-            </p>
+          {/* Confidence Rating */}
+          <div className="mt-5">
+            <p className="text-sm text-gray-600 mb-2">{t.howConfident}</p>
             <div className="flex gap-2">
               {[
                 { num: 1, label: t.veryLow },
@@ -304,11 +471,11 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
               ].map((item) => (
                 <button
                   key={item.num}
-                  onClick={() => handleConfidenceRating(item.num, 'pre')}
+                  onClick={() => setConfidence(item.num)}
                   className={`flex-1 px-2 py-2 rounded-lg font-medium transition ${
-                    confidencePre === item.num
+                    confidence === item.num
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   <div className="text-lg">{item.num}</div>
@@ -319,338 +486,27 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
           </div>
 
           <button
-            onClick={handleSubmitHypothesis}
-            disabled={!hypothesis || !confidencePre}
-            className={`mt-6 w-full py-3 rounded-lg font-bold text-lg transition ${
-              hypothesis && confidencePre
-                ? 'bg-purple-600 text-white hover:bg-purple-700'
+            onClick={handleSubmitFinal}
+            disabled={!confidence || finalDiagnosis.trim().length < 3}
+            className={`mt-6 w-full py-4 rounded-lg font-bold text-lg transition ${
+              confidence && finalDiagnosis.trim().length >= 3
+                ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {t.submitHypothesis} → <span className="text-sm font-normal opacity-75">(Ctrl+Enter)</span>
+            {t.submitFinalDiagnosisButton} → <span className="text-sm font-normal opacity-75">(Ctrl+Enter)</span>
           </button>
         </div>
-      ) : (
-        <>
-          {/* CONTRASTIVE EVIDENCE: After hypothesis submitted */}
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg shadow-md p-6 border border-purple-200">
-            <div className="mb-4">
-              <h3 className="text-2xl font-bold text-gray-800">
-                {t.youDiagnosed} <span className="text-purple-700">{hypothesis}</span>
-              </h3>
-              <p className="text-gray-600 mt-2">
-                {t.evaluateEvidence}
-              </p>
-            </div>
 
-            {/* Dynamic Contrastive Evidence (NEW - GPT-4 Generated) */}
-            {loadingEvidence ? (
-              <div className="bg-white rounded-lg p-8 text-center border-2 border-indigo-300">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">
-                  {t.evaluating}
-                </p>
-              </div>
-            ) : dynamicEvidence ? (
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {/* SUPPORTS Column - NOW DYNAMIC */}
-                <div className="bg-green-50 rounded-lg p-4 border-2 border-green-300">
-                  <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2">
-                    <span className="text-2xl">✓</span>
-                    {t.supports}
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    {dynamicEvidence.supporting.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* CHALLENGES Column - NOW DYNAMIC */}
-                <div className="bg-red-50 rounded-lg p-4 border-2 border-red-300">
-                  <h4 className="font-bold text-red-800 mb-3 flex items-center gap-2">
-                    <span className="text-2xl">✗</span>
-                    {t.challenges}
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    {dynamicEvidence.challenging.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-red-600 mt-0.5">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
-
-            {/* PROGRESSIVE REVEAL BUTTONS (Partiality Mechanism) */}
-            <div className="bg-white rounded-lg p-4 border border-gray-300">
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                {t.revealEvidence}
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {availablePanels.map((panel) => {
-                  const isRevealed = revealedPanels.includes(panel.id);
-                  return (
-                    <button
-                      key={panel.id}
-                      onClick={() => handleRevealPanel(panel.id)}
-                      className={`px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 ${
-                        isRevealed
-                          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      <span>{panel.icon}</span>
-                      <span>
-                        {isRevealed
-                          ? `✓ ${panel.label.replace(/^(Show|Показать)\s+/i, '')} ${t.hideLabel}`
-                          : panel.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* REVEALED EVIDENCE PANELS */}
-            {revealedPanels.map((panelId) => (
-              <div
-                key={panelId}
-                className="mt-4 bg-white rounded-lg p-5 border-2 border-indigo-300 animate-fadeIn"
-              >
-                <h4 className="font-bold text-indigo-800 mb-3 text-lg flex items-center gap-2">
-                  <span>
-                    {availablePanels.find((p) => p.id === panelId)?.icon}
-                  </span>
-                  {availablePanels.find((p) => p.id === panelId)?.label}
-                </h4>
-                <div className="text-sm text-gray-700">
-                  {/* Render panel-specific content */}
-                  {panelId === 'labs' && (
-                    <div className="space-y-2">
-                      {caseData.labs ? (
-                        Object.entries(caseData.labs)
-                          .filter(([key]) => key !== 'source') // Exclude metadata
-                          .map(([key, value]) => {
-                            const labName = t[key] || key.replace(/([A-Z_])/g, ' $1').trim();
-                            return (
-                              <p key={key}>
-                                <strong>{labName}:</strong> {value}
-                              </p>
-                            );
-                          })
-                      ) : (
-                        <p className="text-gray-500 italic">
-                          {language === 'ru' ? 'Лабораторные данные недоступны' : 'Lab data unavailable'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {panelId === 'vitals' && (
-                    <div>
-                      <p className="mb-3 text-gray-700">
-                        <strong>{language === 'ru' ? 'Текущие показатели:' : 'Current vitals:'}</strong>
-                      </p>
-                      {caseData.vitals ? (
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div className="bg-gray-50 p-2 rounded">
-                            <span className="text-gray-600">{t.temp}:</span>
-                            <span className="ml-2 font-medium">{caseData.vitals.temperature}</span>
-                          </div>
-                          <div className="bg-gray-50 p-2 rounded">
-                            <span className="text-gray-600">{t.bp}:</span>
-                            <span className="ml-2 font-medium">{caseData.vitals.bloodPressure}</span>
-                          </div>
-                          <div className="bg-gray-50 p-2 rounded">
-                            <span className="text-gray-600">{t.hr}:</span>
-                            <span className="ml-2 font-medium">{caseData.vitals.heartRate}</span>
-                          </div>
-                          <div className="bg-gray-50 p-2 rounded">
-                            <span className="text-gray-600">{t.rr}:</span>
-                            <span className="ml-2 font-medium">{caseData.vitals.respiratoryRate}</span>
-                          </div>
-                          <div className="bg-gray-50 p-2 rounded col-span-2">
-                            <span className="text-gray-600">{t.o2sat}:</span>
-                            <span className="ml-2 font-medium">{caseData.vitals.oxygenSaturation}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 italic text-sm">
-                          {language === 'ru' ? 'Жизненные показатели недоступны' : 'Vital signs unavailable'}
-                        </p>
-                      )}
-                      <p className="mt-3 text-xs text-gray-500">
-                        {language === 'ru'
-                          ? '* Динамические данные за 24 часа не зафиксированы в данном клиническом случае'
-                          : '* 24-hour trend data not recorded for this case'}
-                      </p>
-                    </div>
-                  )}
-                  {panelId === 'imaging' && (
-                    <div className="space-y-3">
-                      <p className="font-semibold text-gray-800 mb-2">
-                        {t.imagingResults}
-                      </p>
-                      {(caseData.imaging || caseData.imaging_ru) ? (
-                        <div className="bg-gray-50 p-4 rounded border border-gray-300">
-                          <p className="text-gray-800 text-sm leading-relaxed">
-                            {getCaseField(caseData, 'imaging', language)}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 italic text-sm">
-                          {language === 'ru'
-                            ? 'Данные визуализации недоступны для данного случая'
-                            : 'Imaging data unavailable for this case'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {panelId === 'symptoms' && (
-                    <div className="space-y-3">
-                      <div>
-                        <p className="font-semibold text-gray-800 mb-1">
-                          {language === 'ru' ? 'Основная жалоба:' : 'Chief Complaint:'}
-                        </p>
-                        <p className="text-gray-700 text-sm">
-                          {getCaseField(caseData, 'chiefComplaint', language)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800 mb-1">
-                          {language === 'ru' ? 'Ключевые симптомы:' : 'Key Symptoms:'}
-                        </p>
-                        <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                          {getCaseField(caseData, 'history', language)
-                            .split('.')
-                            .filter(s => s.trim().length > 10)
-                            .slice(0, 4)
-                            .map((symptom, idx) => (
-                              <li key={idx}>{symptom.trim()}</li>
-                            ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800 mb-1">
-                          {language === 'ru' ? 'Физикальное обследование:' : 'Physical Examination:'}
-                        </p>
-                        <p className="text-gray-700 text-sm">
-                          {getCaseField(caseData, 'physicalExam', language)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* FINAL DECISION */}
-          <div className="bg-white rounded-lg shadow-md p-6 border border-gray-300">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
-              {t.finalDecision}
-            </h3>
-
-            {!revisedHypothesis ? (
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  {t.wouldYouLikeToRevise}
-                </p>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setRevisedHypothesis(false)}
-                    className="flex-1 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition"
-                  >
-                    {t.keepDiagnosis} {hypothesis}
-                  </button>
-                  <button
-                    onClick={handleReviseHypothesis}
-                    className="flex-1 py-3 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 transition"
-                  >
-                    {t.reviseDiagnosis}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  {t.originalDiagnosis} <span className="font-medium">{hypothesis}</span>
-                </p>
-                <textarea
-                  value={finalDiagnosis}
-                  onChange={(e) => setFinalDiagnosis(e.target.value)}
-                  placeholder={t.enterRevised}
-                  className="w-full p-4 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-lg"
-                  rows={2}
-                />
-              </div>
-            )}
-
-            {/* Post-Confidence Rating */}
-            <div className="mt-6">
-              <p className="text-sm text-gray-600 mb-2">
-                {t.howConfident}
-              </p>
-              <div className="flex gap-2">
-                {[
-                  { num: 1, label: t.veryLow },
-                  { num: 2, label: t.low },
-                  { num: 3, label: t.moderate },
-                  { num: 4, label: t.high },
-                  { num: 5, label: t.veryHigh },
-                ].map((item) => (
-                  <button
-                    key={item.num}
-                    onClick={() => handleConfidenceRating(item.num, 'post')}
-                    className={`flex-1 px-2 py-2 rounded-lg font-medium transition ${
-                      confidencePost === item.num
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    <div className="text-lg">{item.num}</div>
-                    <div className="text-xs">{item.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={handleSubmitFinal}
-              disabled={!confidencePost}
-              className={`mt-6 w-full py-4 rounded-lg font-bold text-lg transition ${
-                confidencePost
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {t.submitFinal} → <span className="text-sm font-normal opacity-75">(Ctrl+Enter)</span>
-            </button>
-          </div>
-        </>
-      )}
+      </div>
 
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
+        .animate-fadeIn { animation: fadeIn 0.25s ease-out; }
       `}</style>
-    </div>
     </>
   );
 }
