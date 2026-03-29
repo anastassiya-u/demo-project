@@ -79,10 +79,15 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
         }),
       });
       const data = await res.json();
-      if (data.evaluation) {
+      // API returns { supporting: [...], challenging: [...] } directly
+      const rawFor = data.supporting || data.evidenceFor || [];
+      const rawAgainst = data.challenging || data.evidenceAgainst || [];
+      if (rawFor.length > 0 || rawAgainst.length > 0) {
+        // Equalise lengths: keep min(for, against) items from each
+        const count = Math.min(rawFor.length, rawAgainst.length) || Math.max(rawFor.length, rawAgainst.length);
         setUserRowEvidence({
-          argsFor: data.evaluation.evidenceFor || data.evaluation.supporting || [],
-          argsAgainst: data.evaluation.evidenceAgainst || data.evaluation.challenging || [],
+          argsFor: rawFor.slice(0, count),
+          argsAgainst: rawAgainst.slice(0, count),
         });
         await logger.submitHypothesis(userRowHypothesis.trim());
       }
@@ -301,8 +306,14 @@ export default function CriticInterface({ caseData, onComplete, accuracyLevel, l
                   suggestedHypotheses.map((h, i) => {
                     const label = ['A', 'B', 'C'][i] || String(i + 1);
                     const diagnosis = getHypothesisField(h, 'diagnosis');
-                    const argsFor = getHypothesisField(h, 'argsFor');
-                    const argsAgainst = getHypothesisField(h, 'argsAgainst');
+                    const rawFor = getHypothesisField(h, 'argsFor');
+                    const rawAgainst = getHypothesisField(h, 'argsAgainst');
+                    // Equalise: show same number of bullets in both columns
+                    const count = Array.isArray(rawFor) && Array.isArray(rawAgainst)
+                      ? Math.min(rawFor.length, rawAgainst.length)
+                      : 0;
+                    const argsFor = Array.isArray(rawFor) ? rawFor.slice(0, count) : [];
+                    const argsAgainst = Array.isArray(rawAgainst) ? rawAgainst.slice(0, count) : [];
                     return (
                       <tr key={h.id || i} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                         <td className="px-4 py-4 align-top">
