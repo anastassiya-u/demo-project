@@ -201,7 +201,6 @@ export default function SessionOrchestrator() {
       const { data: user, error: userError } = await supabase
         .from('users')
         .insert({
-          student_id: formData.studentId,
           age: formData.age,
           gender: formData.gender,
           medical_school: formData.medicalSchool,
@@ -220,7 +219,7 @@ export default function SessionOrchestrator() {
 
       // Set state
       setUserId(user.id);
-      setStudentId(formData.studentId);
+      setStudentId(user.student_id);
       setParadigm(group.paradigm);
       setAccuracyLevel(group.accuracy_level);
       setRandomizationSeed(seed);
@@ -621,10 +620,9 @@ export default function SessionOrchestrator() {
             improve AI-assisted clinical education in Kazakhstan.
           </p>
           <div className="bg-gray-50 p-6 rounded-lg mb-6">
+            <p className="text-sm text-gray-600 mb-2">Your participant number (please note it down):</p>
+            <p className="text-4xl font-bold font-mono text-blue-700 mb-3">{studentId}</p>
             <p className="text-sm text-gray-600">
-              Participant ID: <span className="font-mono">{studentId}</span>
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
               Please contact the research team to schedule your interview.
             </p>
           </div>
@@ -682,7 +680,6 @@ function PhaseHeader({ phase, description, caseNumber, totalCases, language = 'r
 
 function RegistrationForm({ onSubmit }) {
   const [formData, setFormData] = useState({
-    studentId: '',
     age: '',
     gender: '',
     medicalSchool: '',
@@ -691,8 +688,6 @@ function RegistrationForm({ onSubmit }) {
   });
 
   const [consentGiven, setConsentGiven] = useState(false);
-  const [studentIdStatus, setStudentIdStatus] = useState(null); // 'checking' | 'valid' | 'duplicate' | 'invalid'
-  const [studentIdError, setStudentIdError] = useState('');
 
   // Notifications
   const { showNotification, NotificationComponent } = useNotification();
@@ -702,76 +697,13 @@ function RegistrationForm({ onSubmit }) {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-
-    // Reset ID validation when user types
-    if (e.target.name === 'studentId') {
-      setStudentIdStatus(null);
-      setStudentIdError('');
-    }
-  };
-
-  const validateStudentId = async (id) => {
-    if (!id || id.length < 3) {
-      setStudentIdStatus('invalid');
-      setStudentIdError(t.studentIdTooShort);
-      return false;
-    }
-
-    setStudentIdStatus('checking');
-
-    try {
-      // Check for duplicate in database
-      const { data, error } = await supabase
-        .from('users')
-        .select('student_id')
-        .eq('student_id', id)
-        .single();
-
-      // PGRST116 = no rows found (which means ID is available - good!)
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (data) {
-        setStudentIdStatus('duplicate');
-        setStudentIdError(t.studentIdDuplicate);
-        return false;
-      }
-
-      setStudentIdStatus('valid');
-      setStudentIdError('');
-      return true;
-    } catch (err) {
-      console.error('Error checking student ID:', err);
-      setStudentIdStatus('invalid');
-      setStudentIdError(t.studentIdCheckError);
-      return false;
-    }
-  };
-
-  const handleStudentIdBlur = () => {
-    if (formData.studentId) {
-      validateStudentId(formData.studentId);
-    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if validation is still running
-    if (studentIdStatus === 'checking') {
-      showNotification('Please wait while we verify your Student ID', 'info', 3000);
-      return;
-    }
-
     if (!consentGiven) {
       showNotification('Please provide informed consent to participate', 'warning');
-      return;
-    }
-
-    // Validate student ID before submission
-    const isValid = await validateStudentId(formData.studentId);
-    if (!isValid) {
       return;
     }
 
@@ -811,45 +743,6 @@ function RegistrationForm({ onSubmit }) {
             🇷🇺 Русский
           </button>
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {t.studentIdLabel}
-        </label>
-        <p className="text-xs text-gray-600 mb-2">
-          {t.studentIdHelp}
-        </p>
-        <div className="relative">
-          <input
-            type="text"
-            name="studentId"
-            value={formData.studentId}
-            onChange={handleChange}
-            onBlur={handleStudentIdBlur}
-            required
-            className={`w-full p-3 pr-10 border rounded-lg focus:ring-2 transition ${
-              studentIdStatus === 'valid'
-                ? 'border-green-500 focus:ring-green-500'
-                : studentIdStatus === 'duplicate' || studentIdStatus === 'invalid'
-                ? 'border-red-500 focus:ring-red-500'
-                : 'border-gray-300 focus:ring-blue-500'
-            }`}
-            placeholder={t.studentIdPlaceholder}
-          />
-          {studentIdStatus === 'checking' && (
-            <span className="absolute right-3 top-3.5 text-gray-400">⌛</span>
-          )}
-          {studentIdStatus === 'valid' && (
-            <span className="absolute right-3 top-3.5 text-green-600">✓</span>
-          )}
-          {(studentIdStatus === 'duplicate' || studentIdStatus === 'invalid') && (
-            <span className="absolute right-3 top-3.5 text-red-600">✗</span>
-          )}
-        </div>
-        {studentIdError && (
-          <p className="text-xs text-red-600 mt-1">{studentIdError}</p>
-        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
