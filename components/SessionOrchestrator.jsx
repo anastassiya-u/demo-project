@@ -201,6 +201,8 @@ export default function SessionOrchestrator() {
       const { data: user, error: userError } = await supabase
         .from('users')
         .insert({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           age: formData.age,
           gender: formData.gender,
           medical_school: formData.medicalSchool,
@@ -680,6 +682,8 @@ function PhaseHeader({ phase, description, caseNumber, totalCases, language = 'r
 
 function RegistrationForm({ onSubmit }) {
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     age: '',
     gender: '',
     medicalSchool: '',
@@ -742,6 +746,33 @@ function RegistrationForm({ onSubmit }) {
           >
             🇷🇺 Русский
           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t.firstNameLabel}</label>
+          <input
+            type="text"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder={t.firstNamePlaceholder}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t.lastNameLabel}</label>
+          <input
+            type="text"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder={t.lastNamePlaceholder}
+          />
         </div>
       </div>
 

@@ -14,6 +14,8 @@ CREATE TABLE users (
 
   -- Demographics
   student_id VARCHAR(50) UNIQUE NOT NULL,
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
   age INTEGER,
   gender VARCHAR(20),
   medical_school VARCHAR(200),
